@@ -1,0 +1,50 @@
+/* Base styles */ 
+body { 
+    min-height: 100vh; 
+    display: flex; 
+    flex-direction: column; 
+} 
+ECHO is on.
+main { 
+    flex: 1; 
+    padding: 20px 0; 
+} 
+ECHO is on.
+/* Navbar styles */ 
+.navbar { 
+    box-shadow: 0 2px 4px rgba(0,0,0,.1); 
+} 
+ECHO is on.
+/* Form styles */ 
+.form-group { 
+    margin-bottom: 1rem; 
+} 
+ECHO is on.
+/* Alert styles */ 
+.alert { 
+    margin-top: 1rem; 
+} 
+ECHO is on.
+/* Card styles */ 
+.card { 
+    margin-bottom: 1.5rem; 
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); 
+} 
+ECHO is on.
+/* Button styles */ 
+.btn { 
+    margin: 0.25rem; 
+} 
+ECHO is on.
+/* Responsive images */ 
+.img-fluid { 
+    max-width: 100%; 
+    height: auto; 
+} 
+ECHO is on.
+/* Footer styles */ 
+footer { 
+    background-color: #f8f9fa; 
+    padding: 20px 0; 
+    margin-top: auto; 
+} 

@@ -1,0 +1,10 @@
+{% extends base.html %^^^
+{% block title %%}My Products{% endblock %%}^^^
+{% block content %%}^^^
+{% for product in products %%}^^^
+{% if product.image %%}^^^
+{% endif %%}^^^
+{% if product.is_available %%}Available{% else %%}Out of Stock{% endif %%}^^^
+{% empty %%}^^^
+{% endfor %%}^^^
+{% endblock %%}
