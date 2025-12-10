@@ -1,44 +1,111 @@
 {% extends 'base.html' %}
-
-{% block title %}Vendor Dashboard{% endblock %}
+{% load static %}
+{% load humanize %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-12">
-            <h1>Vendor Dashboard</h1>
-            <p>Welcome to your vendor dashboard, {{ user.username }}!</p>
-            
-            <!-- Add vendor-specific content here -->
-            <div class="row mt-4">
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Products</h5>
-                            <p class="card-text">Manage your products and inventory</p>
-                            <a href="{% url 'vendor:product_list' %}" class="btn btn-primary">View Products</a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Orders</h5>
-                            <p class="card-text">View and manage customer orders</p>
-                            <a href="{% url 'vendor:order_list' %}" class="btn btn-primary">View Orders</a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Profile</h5>
-                            <p class="card-text">Update your vendor profile</p>
-                            <a href="{% url 'vendor:profile' %}" class="btn btn-primary">View Profile</a>
-                        </div>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-0">Vendor Dashboard</h2>
+            <p class="text-muted">Welcome back, {{ vendor.business_name }}</p>
+        </div>
+        <div>
+            <a href="{% url 'vendor:product_add' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Product
+            </a>
+            <a href="{% url 'vendor:settings' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100 border-start border-4 border-success">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold">Total Revenue</div>
+                    <div class="h3 mb-0">${{ total_revenue|intcomma }}</div>
+                    <div class="small text-success mt-2">
+                        <i class="fas fa-calendar-alt"></i> This Month: ${{ monthly_sales|intcomma }}
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100 border-start border-4 border-primary">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold">Total Orders</div>
+                    <div class="h3 mb-0">{{ total_orders }}</div>
+                    <div class="d-flex justify-content-between mt-2 small">
+                        <span class="text-warning">Pending: {{ pending_orders }}</span>
+                        <span class="text-success">Completed: {{ completed_orders }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100 border-start border-4 border-info">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase fw-bold">Total Products</div>
+                    <div class="h3 mb-0">{{ total_products }}</div>
+                    <div class="small text-danger mt-2">
+                        Low Stock: {{ low_stock }} | Out: {{ out_of_stock }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Recent Orders</h5>
+            <a href="{% url 'vendor:order_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.customer.get_full_name|default:order.customer.email }}</td>
+                        <td>{{ order.created_at|date:"M d, Y" }}</td>
+                        <td>${{ order.total_amount|intcomma }}</td>
+                        <td>
+                            <span class="badge rounded-pill 
+                                {% if order.status == 'Completed' or order.status == 'Delivered' %}bg-success
+                                {% elif order.status == 'Pending' %}bg-warning text-dark
+                                {% elif order.status == 'Cancelled' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'vendor:order_detail' order.id %}" class="btn btn-sm btn-light">
+                                Details
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            No orders found yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

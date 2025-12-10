@@ -23,7 +23,8 @@ INSTALLED_APPS = [
     'orders',
     'vendors',  # Add this line
     'crispy_forms',
-    'crispy_bootstrap5'
+    'crispy_bootstrap5',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -99,10 +100,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication
-AUTH_USER_MODEL = 'accounts.User'  # or whatever your custom user model is called
-LOGIN_URL = 'login'
-LOGOUT_REDIRECT_URL = 'login'
+# or whatever your custom user model is called
+# Authentication
+LOGIN_URL = 'accounts:login'  # Updated to use namespace
+LOGIN_REDIRECT_URL = 'home'   # Add this line to specify where to redirect after login
+LOGOUT_REDIRECT_URL = 'home'  # Updated to use namespace
+LOGOUT_URL = 'accounts:logout'  # Add this line
 
 # Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'
+# settings.py
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'izabayojonas457@gmail.com'  # Replace with your Gmail
+EMAIL_HOST_PASSWORD = 'rvps cwnp hvje next'  # Replace with your App Password
+DEFAULT_FROM_EMAIL = 'izabayojonas457@gmail.com'  # Should match EMAIL_HOST_USER

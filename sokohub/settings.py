@@ -3,7 +3,6 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent 
-print(f"Correct BASE_DIR: {BASE_DIR}")
 
 # Templates
 TEMPLATES = [
@@ -52,18 +51,29 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.template': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'accounts': {
+            'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': True,
         },
     },
 }
 
-# Print the template directories being searched (Debug info)
-import django.template.utils
-try:
-    print("\nTemplate directories:")
-    for template_dir in django.template.utils.get_app_template_dirs('templates'):
-        print(f"- {template_dir}")
-    print(f"- {os.path.join(BASE_DIR, 'templates')}\n")
-except Exception:
-    pass

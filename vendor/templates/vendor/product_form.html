@@ -1,22 +1,80 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
 
-{% block title %}{% if form.instance.id %}Edit{% else %}Add{% endif %} Product{% endblock %}
+{% block title %}
+    {% if form.instance.pk %}Edit Product{% else %}Add New Product{% endif %}
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header">
-                    <h2>{% if form.instance.id %}Edit{% else %}Add New{% endif %} Product</h2>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.pk %}Edit Product{% else %}Add New Product{% endif %}
+                    </h4>
                 </div>
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
-                        {{ form.as_p }}
-                        <div class="form-group mt-3">
-                            <button type="submit" class="btn btn-primary">Save</button>
-                            <a href="{% url 'vendor:product_list' %}" class="btn btn-secondary">Cancel</a>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Product Name</label>
+                                {{ form.name }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0">Category</label>
+                                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                                        <i class="fas fa-plus-circle"></i> Add New
+                                    </button>
+                                </div>
+                                {{ form.category }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Price</label>
+                                {{ form.price }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stock Quantity</label>
+                                {{ form.stock }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Status</label>
+                                {{ form.status }}
+                            </div>
+                            
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Product Image</label>
+                                {{ form.image }}
+                                {% if form.instance.image %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">Current Image:</small><br>
+                                        <img src="{{ form.instance.image.url }}" alt="Current" style="height: 80px; border-radius: 5px;">
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Description</label>
+                                {{ form.description }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'vendor:product_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            
+                            <div>
+                                {% if not form.instance.pk %}
+                                <button type="submit" name="save_and_add_another" class="btn btn-outline-primary me-2">Save & Add Another</button>
+                                {% endif %}
+                                <button type="submit" class="btn btn-primary">Save Product</button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -24,4 +82,78 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="newCategoryName" class="form-label">Category Name</label>
+                    <input type="text" class="form-control" id="newCategoryName" placeholder="e.g., Electronics">
+                    <div id="categoryError" class="text-danger small mt-1" style="display:none;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveNewCategory()">Save Category</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function saveNewCategory() {
+    const input = document.getElementById('newCategoryName');
+    const errorDiv = document.getElementById('categoryError');
+    const categoryName = input.value.trim();
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    if (!categoryName) {
+        errorDiv.textContent = "Please enter a name.";
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    // Prepare data
+    const formData = new FormData();
+    formData.append('category_name', categoryName);
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    // Send to server
+    fetch("{% url 'vendor:add_category_ajax' %}", {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 1. Add new option to dropdown
+            const select = document.getElementById('id_category'); // Django default ID
+            const option = new Option(data.name, data.id);
+            select.add(option, undefined);
+            
+            // 2. Select it
+            select.value = data.id;
+
+            // 3. Close modal and clear input
+            input.value = '';
+            errorDiv.style.display = 'none';
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'));
+            modal.hide();
+        } else {
+            errorDiv.textContent = data.error || "Error creating category.";
+            errorDiv.style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        errorDiv.textContent = "Something went wrong.";
+        errorDiv.style.display = 'block';
+    });
+}
+</script>
 {% endblock %}

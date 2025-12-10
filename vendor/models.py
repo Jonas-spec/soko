@@ -16,6 +16,14 @@ class Vendor(models.Model):
         _('shop name'),
         max_length=100
     )
+    # --- ADDED LOGO FIELD HERE ---
+    logo = models.ImageField(
+        _('shop logo'),
+        upload_to='vendor/logos/',
+        blank=True,
+        null=True
+    )
+    # -----------------------------
     phone = models.CharField(
         _('phone'),
         max_length=20,
@@ -58,7 +66,7 @@ class Vendor(models.Model):
         _('updated at'),
         auto_now=True
     )
-    
+
     class Meta:
         verbose_name = _('vendor')
         verbose_name_plural = _('vendors')
@@ -66,15 +74,20 @@ class Vendor(models.Model):
 
     def __str__(self):
         return self.shop_name
-        
+
     @property
     def total_products(self):
         """Return the total number of products for this vendor."""
+        # Using string import to avoid circular dependency errors
         from products.models import Product
         return Product.objects.filter(vendor=self.user).count()
-        
+
     @property
     def total_orders(self):
         """Return the total number of orders for this vendor."""
-        from orders.models import Order
-        return Order.objects.filter(vendor=self.user).count()
+        # Note: Ensure you have an 'orders' app created for this to work
+        try:
+            from orders.models import Order
+            return Order.objects.filter(vendor=self.user).count()
+        except ImportError:
+            return 0
