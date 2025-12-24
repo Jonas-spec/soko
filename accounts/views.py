@@ -32,15 +32,6 @@ class CustomLoginView(SuccessMessageMixin, LoginView):
         storage.used = True
         return response
 
-
-def logout_view(request):
-    """
-    Allow logout via GET or POST and redirect home.
-    """
-    logout(request)
-    messages.info(request, "You have been logged out.")
-    return redirect('home')
-
     def form_valid(self, form):
         """Security check complete. Log the user in."""
         user = form.get_user()
@@ -50,8 +41,14 @@ def logout_view(request):
             messages.error(self.request, 'Your account is inactive. Please contact support.')
             return self.form_invalid(form)
             
-        # Check if vendor is approved
-        if hasattr(user, 'vendor') and not user.vendor.is_approved:
+        # Check if vendor is approved (check both vendor and vendor_profile)
+        vendor = None
+        if hasattr(user, 'vendor_profile'):
+            vendor = user.vendor_profile
+        elif hasattr(user, 'vendor'):
+            vendor = user.vendor
+            
+        if vendor and not vendor.is_approved:
             login(self.request, user)
             messages.warning(self.request, 'Your vendor account is pending approval.')
             return redirect('vendor:waiting_approval')
@@ -65,13 +62,29 @@ def logout_view(request):
         if user.is_superuser or user.is_staff:
             return reverse('admin:index')
             
-        if hasattr(user, 'vendor'):
-            if user.vendor.is_approved:
+        # Check both vendor and vendor_profile
+        vendor = None
+        if hasattr(user, 'vendor_profile'):
+            vendor = user.vendor_profile
+        elif hasattr(user, 'vendor'):
+            vendor = user.vendor
+            
+        if vendor:
+            if vendor.is_approved:
                 return reverse('vendor:dashboard')
             return reverse('vendor:waiting_approval')
             
         # Default redirect for customers and other users
         return reverse('home')
+
+
+def logout_view(request):
+    """
+    Allow logout via GET or POST and redirect home.
+    """
+    logout(request)
+    messages.info(request, "You have been logged out.")
+    return redirect('home')
         
 class RegisterView(CreateView):
     form_class = UserRegistrationForm
@@ -113,25 +126,54 @@ def profile(request):
     """
     Allows users to edit their basic profile information.
     Handles both User and profile model updates.
+    Supports both accounts.Vendor and vendor.models.Vendor.
     """
     user = request.user
-    profile = None
+    profile_obj = None
+    profile_form_class = None
     
-    # Determine the profile type
+    # Determine the profile type - check both vendor models
     if hasattr(user, 'vendor'):
-        profile = user.vendor
+        profile_obj = user.vendor
         profile_form_class = VendorProfileForm
+    elif hasattr(user, 'vendor_profile'):
+        # If user has vendor_profile, redirect to vendor profile page
+        # or create accounts.Vendor to sync
+        from accounts.models import Vendor as AccountsVendor
+        try:
+            # Try to get or create accounts.Vendor to sync
+            profile_obj, created = AccountsVendor.objects.get_or_create(
+                user=user,
+                defaults={
+                    'shop_name': user.vendor_profile.shop_name,
+                    'is_approved': user.vendor_profile.is_approved,
+                    'phone': user.vendor_profile.phone or '',
+                    'address': user.vendor_profile.address or '',
+                    'city': user.vendor_profile.city or '',
+                    'postal_code': user.vendor_profile.postal_code or '',
+                    'country': user.vendor_profile.country or '',
+                }
+            )
+            profile_form_class = VendorProfileForm
+        except Exception:
+            # If sync fails, redirect to vendor profile
+            return redirect('vendor:profile')
     elif hasattr(user, 'customer'):
-        profile = user.customer
+        profile_obj = user.customer
         profile_form_class = CustomerProfileForm
     else:
         # If no profile exists, redirect to registration
         messages.warning(request, 'Please complete your profile setup.')
-        return redirect('accounts:register_additional')
+        return redirect('accounts:register')
 
     if request.method == 'POST':
         user_form = UserChangeForm(request.POST, instance=user)
-        profile_form = profile_form_class(request.POST, instance=profile)
+        # Handle file uploads for vendor logo
+        profile_form = profile_form_class(
+            request.POST, 
+            request.FILES,
+            instance=profile_obj
+        )
         
         if user_form.is_valid() and profile_form.is_valid():
             user_form.save()
@@ -140,12 +182,13 @@ def profile(request):
             return redirect('accounts:profile')
     else:
         user_form = UserChangeForm(instance=user)
-        profile_form = profile_form_class(instance=profile)
+        profile_form = profile_form_class(instance=profile_obj)
     
     return render(request, 'accounts/profile.html', {
         'user_form': user_form,
         'profile_form': profile_form,
-        'is_vendor': hasattr(user, 'vendor'),
+        'profile': profile_obj,
+        'is_vendor': hasattr(user, 'vendor') or hasattr(user, 'vendor_profile'),
         'is_customer': hasattr(user, 'customer')
     })
 
@@ -166,7 +209,7 @@ def profile_complete(request):
             return redirect('vendor:become_vendor')
         return redirect('accounts:complete_customer_profile')
     
-    return redirect('accounts:register_additional')
+    return redirect('accounts:register')
 
 @login_required
 def home(request):

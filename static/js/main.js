@@ -1,82 +1,84 @@
- // Main JavaScript for form handling
+// SOKOHUB Main JavaScript
+
+// Update cart count on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle form submissions
-    const forms = document.querySelectorAll('form[data-ajax="true"]');
+    updateCartCount();
     
-    forms.forEach(form => {
+    // Handle add to cart forms
+    const addToCartForms = document.querySelectorAll('.add-to-cart-form');
+    addToCartForms.forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
+            const formData = new FormData(this);
             
-            const formData = new FormData(form);
-            const submitButton = form.querySelector('button[type="submit"]');
-            const originalButtonText = submitButton.innerHTML;
-            
-            // Show loading state
-            submitButton.disabled = true;
-            submitButton.innerHTML = 'Sending...';
-            
-            // Get form attributes
-            const method = form.method.toUpperCase();
-            const action = form.action || window.location.href;
-            const enctype = form.enctype || 'application/x-www-form-urlencoded';
-            
-            // Handle file uploads
-            const isFileUpload = form.enctype === 'multipart/form-data';
-            
-            fetch(action, {
-                method: method,
-                body: isFileUpload ? formData : new URLSearchParams(formData),
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    ...(!isFileUpload && { 'Content-Type': enctype })
-                },
-                credentials: 'same-origin'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
                 }
-                return response.json();
             })
+            .then(response => response.json())
             .then(data => {
-                // Handle success response
-                if (data.redirect) {
-                    window.location.href = data.redirect;
-                } else if (data.message) {
-                    showMessage('success', data.message);
+                if (data.success) {
+                    updateCartCount();
+                    showNotification(data.message, 'success');
+                } else {
+                    showNotification(data.message, 'error');
                 }
-                form.reset();
             })
             .catch(error => {
                 console.error('Error:', error);
-                showMessage('error', 'An error occurred. Please try again.');
-            })
-            .finally(() => {
-                // Reset button state
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalButtonText;
+                showNotification('An error occurred. Please try again.', 'error');
             });
         });
     });
+});
+
+// Update cart count
+function updateCartCount() {
+    fetch('/orders/cart/')
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const itemCount = doc.querySelectorAll('tbody tr').length;
+            const cartCountEl = document.getElementById('cart-count');
+            if (cartCountEl) {
+                cartCountEl.textContent = itemCount;
+                cartCountEl.style.display = itemCount > 0 ? 'flex' : 'none';
+            }
+        })
+        .catch(error => console.error('Error updating cart count:', error));
+}
+
+// Show notification
+function showNotification(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alert = document.createElement('div');
+    alert.className = `alert ${alertClass} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alert.style.zIndex = '9999';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
     
-    // Show flash messages
-    function showMessage(type, message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `alert alert-${type}`;
-        messageDiv.textContent = message;
-        
-        const container = document.querySelector('.messages') || document.body;
-        container.prepend(messageDiv);
-        
-        // Auto-remove message after 5 seconds
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 5000);
-    }
-    
-    // Initialize any tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+    setTimeout(() => {
+        alert.remove();
+    }, 3000);
+}
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
     });
 });

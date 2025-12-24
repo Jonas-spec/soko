@@ -24,6 +24,7 @@ from .forms import VendorProfileForm, ProductForm
 def vendor_required(view_func):
     """
     Decorator to ensure user is a vendor.
+    Checks for both accounts.Vendor and vendor.models.Vendor.
     """
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
@@ -40,19 +41,11 @@ def vendor_required(view_func):
         if request.user.is_staff:
             return view_func(request, *args, **kwargs)
         
-        # Check if profile exists safely
-        if not hasattr(request.user, 'vendor_profile'):
-            if hasattr(request.user, 'is_vendor') and request.user.is_vendor:
-                Vendor.objects.get_or_create(
-                    user=request.user,
-                    defaults={
-                        'shop_name': f"{request.user.get_full_name() or request.user.username}'s Business",
-                        'is_approved': False
-                    }
-                )
-                messages.info(request, _('A vendor profile has been created for your account.'))
-                return view_func(request, *args, **kwargs)
-            
+        # Check for vendor profile (accounts.Vendor or vendor.models.Vendor)
+        has_vendor = hasattr(request.user, 'vendor')
+        has_vendor_profile = hasattr(request.user, 'vendor_profile')
+        
+        if not has_vendor and not has_vendor_profile:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': False,
@@ -63,19 +56,23 @@ def vendor_required(view_func):
             messages.warning(request, _('You need to register as a vendor to access this page.'))
             return redirect('vendor:become_vendor')
         
-        try:
-            if not request.user.vendor_profile.is_approved:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'success': False,
-                        'inactive_vendor': True,
-                        'message': _('Your vendor account is currently inactive. Please contact support.')
-                    }, status=403)
-                
-                messages.warning(request, _('Your vendor account is currently inactive. Please contact support.'))
-                return redirect('vendor:waiting_approval')
-        except ObjectDoesNotExist:
-            return redirect('vendor:become_vendor')
+        # Check approval status - prefer accounts.Vendor if both exist
+        vendor = None
+        if has_vendor:
+            vendor = request.user.vendor
+        elif has_vendor_profile:
+            vendor = request.user.vendor_profile
+        
+        if vendor and not vendor.is_approved:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'inactive_vendor': True,
+                    'message': _('Your vendor account is currently inactive. Please contact support.')
+                }, status=403)
+            
+            messages.warning(request, _('Your vendor account is currently inactive. Please contact support.'))
+            return redirect('vendor:waiting_approval')
         
         return view_func(request, *args, **kwargs)
     return _wrapped_view
@@ -108,23 +105,42 @@ def become_vendor(request):
 @vendor_required
 def dashboard(request):
     """Vendor dashboard view."""
-    try:
-        vendor = request.user.vendor_profile
-    except ObjectDoesNotExist:
+    # Products use accounts.Vendor, so we need to get that
+    from accounts.models import Vendor as AccountsVendor
+    
+    # Try to get vendor from accounts first (since products use accounts.Vendor)
+    vendor = None
+    if hasattr(request.user, 'vendor'):
+        vendor = request.user.vendor
+    elif hasattr(request.user, 'vendor_profile'):
+        # If only vendor_profile exists, try to get or create accounts.Vendor
+        vendor_profile = request.user.vendor_profile
+        vendor, created = AccountsVendor.objects.get_or_create(
+            user=request.user,
+            defaults={
+                'shop_name': vendor_profile.shop_name,
+                'is_approved': vendor_profile.is_approved,
+                'phone': vendor_profile.phone,
+                'address': vendor_profile.address or '',
+                'city': vendor_profile.city or '',
+                'postal_code': vendor_profile.postal_code or '',
+                'country': vendor_profile.country or '',
+            }
+        )
+    else:
         messages.warning(request, _('User has no vendor profile.'))
         return redirect('vendor:become_vendor')
     
-    # FIX: Use vendor_profile.id to avoid class mismatch errors
-    recent_orders = Order.objects.filter(
-        items__product__vendor__id=vendor.id
-    ).select_related(
-        'customer'
-    ).prefetch_related(
-        'items', 'items__product'
-    ).distinct().order_by('-created_at')[:5]
+    # Get products using accounts.Vendor (which products reference)
+    products = Product.objects.filter(vendor=vendor)
+    total_products = products.count()
+    out_of_stock = products.filter(stock=0).count()
+    low_stock = products.filter(stock__gt=0, stock__lte=10).count()
     
-    # FIX: Use vendor.id here too
-    orders = Order.objects.filter(items__product__vendor__id=vendor.id).distinct()
+    # Get orders - filter by products that belong to this vendor
+    orders = Order.objects.filter(
+        items__product__vendor=vendor
+    ).distinct()
     total_orders = orders.count()
     
     STATUS_PENDING = getattr(Order.Status, 'PENDING', 'Pending')
@@ -133,11 +149,12 @@ def dashboard(request):
     pending_orders = orders.filter(status=STATUS_PENDING).count()
     completed_orders = orders.filter(status=STATUS_COMPLETED).count()
     
-    # FIX: Use vendor_id and REMOVE duplicate incorrect block
-    products = Product.objects.filter(vendor_id=vendor.id)
-    total_products = products.count()
-    out_of_stock = products.filter(stock=0).count()
-    low_stock = products.filter(stock__gt=0, stock__lte=10).count()
+    # Get recent orders
+    recent_orders = orders.select_related(
+        'customer'
+    ).prefetch_related(
+        'items', 'items__product'
+    ).order_by('-created_at')[:5]
     
     # Get revenue
     total_revenue = orders.filter(
@@ -335,11 +352,27 @@ class ProductListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        # FIX: Filter by vendor_profile.id
-        if not hasattr(self.request.user, 'vendor_profile'):
+        # Products use accounts.Vendor, so get that
+        from accounts.models import Vendor as AccountsVendor
+        
+        vendor = None
+        if hasattr(self.request.user, 'vendor'):
+            vendor = self.request.user.vendor
+        elif hasattr(self.request.user, 'vendor_profile'):
+            # Try to get or create accounts.Vendor
+            vendor_profile = self.request.user.vendor_profile
+            vendor, _ = AccountsVendor.objects.get_or_create(
+                user=self.request.user,
+                defaults={
+                    'shop_name': vendor_profile.shop_name,
+                    'is_approved': vendor_profile.is_approved,
+                }
+            )
+        
+        if not vendor:
             return Product.objects.none()
             
-        queryset = Product.objects.filter(vendor_id=self.request.user.vendor_profile.id)
+        queryset = Product.objects.filter(vendor=vendor)
         
         search_query = self.request.GET.get('q')
         if search_query:
@@ -594,17 +627,26 @@ def waiting_approval(request):
     """
     Page shown to vendors who have registered but are not yet approved.
     """
-    if not hasattr(request.user, 'vendor_profile'):
+    # Check for vendor_profile first (vendor app model)
+    if hasattr(request.user, 'vendor_profile'):
+        if request.user.vendor_profile.is_approved:
+            messages.info(request, 'Your vendor account is already approved.')
+            return redirect('vendor:dashboard')
+        vendor = request.user.vendor_profile
+    # Check for vendor (accounts app model)
+    elif hasattr(request.user, 'vendor'):
+        if request.user.vendor.is_approved:
+            messages.info(request, 'Your vendor account is already approved.')
+            return redirect('vendor:dashboard')
+        vendor = request.user.vendor
+    else:
         messages.error(request, 'You need to register as a vendor first.')
         return redirect('vendor:become_vendor')
-    
-    if request.user.vendor_profile.is_approved:
-        messages.info(request, 'Your vendor account is already approved.')
-        return redirect('vendor:dashboard')
-        storage = messages.get_messages(request)
-        storage.used = True
         
-    return render(request, 'vendor/waiting_approval.html')
+    context = {
+        'vendor': vendor
+    }
+    return render(request, 'vendor/waiting_approval.html', context)
     # In vendor/views.py
 @login_required
 def vendor_required(view_func):

@@ -32,6 +32,7 @@ urlpatterns = [
     # --- Main Features ---
     path('vendor/', include(('vendor.urls', 'vendor'), namespace='vendor')),
     path('products/', include(('products.urls', 'products'), namespace='products')),
+    path('orders/', include(('orders.urls', 'orders'), namespace='orders')),
 
     # --- Debugging & Test Views ---
     path('test/', test_view, name='test'),

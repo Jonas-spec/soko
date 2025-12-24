@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Checkout - SOKOHUB{% endblock %}
+
+{% block extra_css %}
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+    .StripeElement {
+        background-color: white;
+        padding: 12px;
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
+        transition: border-color 0.3s ease;
+    }
+    .StripeElement--focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .StripeElement--invalid {
+        border-color: #dc3545;
+    }
+    .StripeElement--complete {
+        border-color: #28a745;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="mb-4"><i class="bi bi-credit-card me-2"></i>Checkout</h2>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Delivery Information</h5>
+                </div>
+                <div class="card-body">
+                    <form id="checkout-form">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="delivery_address" class="form-label">Delivery Address *</label>
+                            <textarea class="form-control" id="delivery_address" name="delivery_address" 
+                                      rows="3" required placeholder="Enter your full delivery address"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Phone Number *</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   required placeholder="+1234567890">
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Payment Information</h5>
+                </div>
+                <div class="card-body">
+                    <div id="card-element">
+                        <!-- Stripe Elements will create form elements here -->
+                    </div>
+                    <div id="card-errors" role="alert" class="text-danger mt-2"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in order.items.all %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ item.product.name }} x{{ item.quantity }}</span>
+                        <span>${{ item.total_price|floatformat:2 }}</span>
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <strong>Total:</strong>
+                        <strong class="text-primary">${{ order.total|floatformat:2 }}</strong>
+                    </div>
+                    <button type="submit" id="submit-button" class="btn btn-primary w-100" disabled>
+                        <i class="bi bi-lock-fill me-2"></i>Pay ${{ order.total|floatformat:2 }}
+                    </button>
+                    <a href="{% url 'orders:cart' %}" class="btn btn-outline-secondary w-100 mt-2">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Cart
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var stripe = Stripe('{{ stripe_publishable_key }}');
+    var elements = stripe.elements();
+    var cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+    
+    var cardErrors = document.getElementById('card-errors');
+    var submitButton = document.getElementById('submit-button');
+    var checkoutForm = document.getElementById('checkout-form');
+    
+    cardElement.on('change', function(event) {
+        if (event.error) {
+            cardErrors.textContent = event.error.message;
+            submitButton.disabled = true;
+        } else {
+            cardErrors.textContent = '';
+            submitButton.disabled = false;
+        }
+    });
+    
+    submitButton.addEventListener('click', function(ev) {
+        ev.preventDefault();
+        submitButton.disabled = true;
+        submitButton.textContent = 'Processing...';
+        
+        stripe.createToken(cardElement).then(function(result) {
+            if (result.error) {
+                cardErrors.textContent = result.error.message;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Pay ${{ order.total|floatformat:2 }}';
+            } else {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{% url "orders:process_payment" %}';
+                
+                var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+                var token = document.createElement('input');
+                token.type = 'hidden';
+                token.name = 'stripeToken';
+                token.value = result.token.id;
+                
+                var address = document.getElementById('delivery_address');
+                var phone = document.getElementById('phone');
+                
+                var addressInput = document.createElement('input');
+                addressInput.type = 'hidden';
+                addressInput.name = 'delivery_address';
+                addressInput.value = address.value;
+                
+                var phoneInput = document.createElement('input');
+                phoneInput.type = 'hidden';
+                phoneInput.name = 'phone';
+                phoneInput.value = phone.value;
+                
+                form.appendChild(csrf.cloneNode(true));
+                form.appendChild(token);
+                form.appendChild(addressInput);
+                form.appendChild(phoneInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Waiting for Approval - SOKOHUB{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-body text-center p-5">
+                    <div class="mb-4">
+                        <i class="fas fa-clock fa-4x text-warning mb-3"></i>
+                        <h2 class="card-title mb-3">Account Pending Approval</h2>
+                        <p class="text-muted lead">
+                            Thank you for registering as a vendor on SOKOHUB!
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Your vendor account is currently under review.</strong>
+                        <p class="mb-0 mt-2">
+                            Our team is reviewing your application. You will receive a notification once your account has been approved.
+                        </p>
+                    </div>
+                    
+                    {% if vendor %}
+                        <div class="card bg-light mb-4">
+                            <div class="card-body">
+                                <h5 class="card-title">Your Shop Information</h5>
+                                <p class="mb-1"><strong>Shop Name:</strong> {{ vendor.shop_name }}</p>
+                                {% if vendor.phone %}
+                                    <p class="mb-1"><strong>Phone:</strong> {{ vendor.phone }}</p>
+                                {% endif %}
+                                <p class="mb-0 text-muted small">
+                                    <strong>Registered:</strong> {{ vendor.created_at|date:"F d, Y" }}
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'home' %}" class="btn btn-primary">
+                            <i class="fas fa-home me-2"></i>Go to Home
+                        </a>
+                        <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-user me-2"></i>Update Profile
+                        </a>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <p class="text-muted small mb-0">
+                        <i class="fas fa-question-circle me-1"></i>
+                        Need help? <a href="mailto:support@sokohub.com">Contact Support</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

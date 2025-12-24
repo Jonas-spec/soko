@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Order #{{ order.id }} - SOKOHUB{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2 class="mb-4">Order #{{ order.id }}</h2>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if item.product.image %}
+                                            <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" 
+                                                 class="img-thumbnail me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-0">{{ item.product.name }}</h6>
+                                            <small class="text-muted">{{ item.product.vendor.shop_name }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ item.quantity }}</td>
+                                <td>${{ item.price|floatformat:2 }}</td>
+                                <td>${{ item.total_price|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> 
+                        <span class="badge 
+                            {% if order.status == 'delivered' %}bg-success
+                            {% elif order.status == 'shipped' %}bg-info
+                            {% elif order.status == 'processing' %}bg-warning
+                            {% elif order.status == 'cancelled' %}bg-danger
+                            {% else %}bg-secondary{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </p>
+                    <p><strong>Order Date:</strong> {{ order.created_at|date:"F d, Y H:i" }}</p>
+                    <p><strong>Total:</strong> ${{ order.total|floatformat:2 }}</p>
+                    <hr>
+                    <p><strong>Delivery Address:</strong></p>
+                    <p class="text-muted">{{ order.delivery_address }}</p>
+                    <p><strong>Phone:</strong> {{ order.phone }}</p>
+                    <a href="{% url 'orders:order_history' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Orders
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
